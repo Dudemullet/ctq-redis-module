@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #define REDISMODULE_EXPERIMENTAL_API 1
 
