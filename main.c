@@ -3,13 +3,25 @@
 const char* CTQ_STORE_NAMESPACE = "ctq:store:";
 const char* CTQ_TEMP_NAMESPACE = "ctq:temp:";
 
-int onMsg(RedisModuleCtx *ctx, int type, const char *event, RedisModuleString *key) {
+void chopN(char *str, size_t n) {
+    size_t len = strlen(str);
+    if (n > len)
+        return;  // Or: n = len;
+    memmove(str, str+n, len - n + 1);
+}
+
+int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleString *redisStringKey) {
+    const char* keyTemp = RedisModule_StringPtrLen(redisStringKey, NULL);
+    char *key = strdup(keyTemp);
+    chopN(key, strlen(CTQ_TEMP_NAMESPACE));
+
     RedisModule_Log(ctx, "warning", "Event: %s", event);
-    RedisModule_Log(ctx, "warning", "Key: %s", RedisModule_StringPtrLen(key, NULL));
+    RedisModule_Log(ctx, "warning", "Event key: %s", RedisModule_StringPtrLen(redisStringKey, NULL));
+    RedisModule_Log(ctx, "warning", "Trimmed key: %s", key);
     return REDISMODULE_OK;
 }
 
-static int addKey(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
+int addKey(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
     RedisModule_AutoMemory(ctx);
     // if (argc != 1)
     //     return RedisModule_WrongArity(ctx);
@@ -45,7 +57,7 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) 
        return REDISMODULE_ERR;
     }
 
-    RedisModule_SubscribeToKeyspaceEvents(ctx, REDISMODULE_NOTIFY_EXPIRED, &onMsg);
+    RedisModule_SubscribeToKeyspaceEvents(ctx, REDISMODULE_NOTIFY_EXPIRED, &onKeyExpired);
 
     int createStatus = RedisModule_CreateCommand(ctx, "ctq.add", addKey, "", 1, 1, 1);
 
