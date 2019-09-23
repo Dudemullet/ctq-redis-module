@@ -10,35 +10,68 @@ void chopN(char *str, size_t n) {
     memmove(str, str+n, len - n + 1);
 }
 
-int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleString *redisStringKey) {
-    const char* keyTemp = RedisModule_StringPtrLen(redisStringKey, NULL);
-    char *key = strdup(keyTemp);
-    chopN(key, strlen(CTQ_TEMP_NAMESPACE));
+char * appendString(const char* base, const char* stringToAppend) {
+    char * newTempKey;
+    size_t userKeyLength = strlen(stringToAppend);
 
+    newTempKey = RedisModule_Alloc(strlen(base) + userKeyLength);
+    newTempKey = strcpy(newTempKey, base);
+    newTempKey = strcat(newTempKey, stringToAppend);
+
+    return newTempKey;
+}
+
+int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleString *redisStringKey) {
+    RedisModule_AutoMemory(ctx);
+    const char* keyTemp = RedisModule_StringPtrLen(redisStringKey, NULL);
+    const char* keyValue;
+    size_t keyValueLen;
+
+    // notify of expired keey
     RedisModule_Log(ctx, "warning", "Event: %s", event);
     RedisModule_Log(ctx, "warning", "Event key: %s", RedisModule_StringPtrLen(redisStringKey, NULL));
-    RedisModule_Log(ctx, "warning", "Trimmed key: %s", key);
+
+    // Trim the temp string from the key
+    char *trimmedKey = strdup(keyTemp);
+    chopN(trimmedKey, strlen(CTQ_TEMP_NAMESPACE));
+    RedisModule_Log(ctx, "warning", "Trimmed key: %s", trimmedKey);
+
+    // Get the key value from the store
+    char* storeKey = appendString(CTQ_STORE_NAMESPACE, trimmedKey);
+    RedisModuleCallReply* reply = RedisModule_Call(ctx, "GET", "c", storeKey);
+    int replyType = RedisModule_CallReplyType(reply);
+    switch (replyType)
+    {
+        case REDISMODULE_REPLY_ERROR:
+            RedisModule_Log(ctx, "warning", "Trying to get key produced error %s", storeKey);
+            return REDISMODULE_ERR;
+            break;
+        case REDISMODULE_REPLY_STRING: 
+            keyValue = RedisModule_CallReplyStringPtr(reply, &keyValueLen);
+            RedisModule_Log(ctx, "warning", "Found key value: %s", keyValue);
+            break;
+        default:
+            return REDISMODULE_ERR;
+            break;
+    }
+
+    // Add trimmedKeys value to a list
+    RedisModuleString* tempVal = RedisModule_CreateString(ctx, keyValue, keyValueLen);
+    RedisModuleString* listName = RedisModule_CreateString(ctx, "TEMP", strlen("TEMP"));
+    RedisModuleKey* listKey = RedisModule_OpenKey(ctx, listName, REDISMODULE_WRITE);
+    RedisModule_ListPush(listKey, REDISMODULE_LIST_TAIL, tempVal);
+
     return REDISMODULE_OK;
 }
 
 int addKey(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
     RedisModule_AutoMemory(ctx);
-    // if (argc != 1)
-    //     return RedisModule_WrongArity(ctx);
 
     char* newStorKey;
     char* newTempKey;
     const char* userKey = RedisModule_StringPtrLen(argv[1], NULL);
-    size_t nameSpaceLength = strlen(CTQ_STORE_NAMESPACE);
-    size_t userKeyLength = strlen(userKey);
-
-    newStorKey = RedisModule_Alloc(nameSpaceLength + userKeyLength);
-    newStorKey = strcpy(newStorKey, CTQ_STORE_NAMESPACE);
-    newStorKey = strcat(newStorKey, userKey);
-
-    newTempKey = RedisModule_Alloc(strlen(CTQ_TEMP_NAMESPACE) + userKeyLength);
-    newTempKey = strcpy(newTempKey, CTQ_TEMP_NAMESPACE);
-    newTempKey = strcat(newTempKey, userKey);
+    newStorKey = appendString(CTQ_STORE_NAMESPACE, userKey);
+    newTempKey = appendString(CTQ_TEMP_NAMESPACE, userKey);
 
     RedisModule_Call(ctx, "SET", "cs", newStorKey, argv[2]);
     RedisModule_Call(ctx, "SET", "cccc", newTempKey, "", "EX", "5");
