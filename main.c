@@ -67,16 +67,16 @@ int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleSt
 int addKey(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
     RedisModule_AutoMemory(ctx);
 
-    char* newStorKey;
+    char* newStoreKey;
     char* newTempKey;
     const char* userKey = RedisModule_StringPtrLen(argv[1], NULL);
-    newStorKey = appendString(CTQ_STORE_NAMESPACE, userKey);
+    newStoreKey = appendString(CTQ_STORE_NAMESPACE, userKey);
     newTempKey = appendString(CTQ_TEMP_NAMESPACE, userKey);
 
-    RedisModule_Call(ctx, "SET", "cs", newStorKey, argv[2]);
+    RedisModule_Call(ctx, "SET", "cs", newStoreKey, argv[2]);
     RedisModule_Call(ctx, "SET", "cccc", newTempKey, "", "EX", "5");
 
-    RedisModule_Free(newStorKey);
+    RedisModule_Free(newStoreKey);
     RedisModule_Free(newTempKey);
 
     RedisModule_ReplyWithNull(ctx);
