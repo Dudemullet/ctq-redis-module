@@ -2,6 +2,8 @@
 
 const char* CTQ_STORE_NAMESPACE = "ctq:store:";
 const char* CTQ_TEMP_NAMESPACE = "ctq:temp:";
+const char* CTQ_STORE_HASH_VALUE = "value";
+const char* CTQ_STORE_HASH_LIST = "list";
 
 void chopN(char *str, size_t n) {
     size_t len = strlen(str);
@@ -24,8 +26,10 @@ char * appendString(const char* base, const char* stringToAppend) {
 int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleString *redisStringKey) {
     RedisModule_AutoMemory(ctx);
     const char* keyTemp = RedisModule_StringPtrLen(redisStringKey, NULL);
-    const char* keyValue;
-    size_t keyValueLen;
+    const char* char_value;
+    const char* char_listName;
+    size_t valueLen;
+    size_t listNameLen;
 
     // notify of expired keey
     RedisModule_Log(ctx, "warning", "Event: %s", event);
@@ -38,26 +42,15 @@ int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleSt
 
     // Get the key value from the store
     char* storeKey = appendString(CTQ_STORE_NAMESPACE, trimmedKey);
-    RedisModuleCallReply* reply = RedisModule_Call(ctx, "GET", "c", storeKey);
-    int replyType = RedisModule_CallReplyType(reply);
-    switch (replyType)
-    {
-        case REDISMODULE_REPLY_ERROR:
-            RedisModule_Log(ctx, "warning", "Trying to get key produced error %s", storeKey);
-            return REDISMODULE_ERR;
-            break;
-        case REDISMODULE_REPLY_STRING: 
-            keyValue = RedisModule_CallReplyStringPtr(reply, &keyValueLen);
-            RedisModule_Log(ctx, "warning", "Found key value: %s", keyValue);
-            break;
-        default:
-            return REDISMODULE_ERR;
-            break;
-    }
+    RedisModuleCallReply* rmr_value = RedisModule_Call(ctx, "HGET", "cc", storeKey, CTQ_STORE_HASH_VALUE);
+    RedisModuleCallReply* rmr_listName = RedisModule_Call(ctx, "HGET", "cc", storeKey, CTQ_STORE_HASH_LIST);
+
+    char_value = RedisModule_CallReplyStringPtr(rmr_value, &valueLen);
+    char_listName = RedisModule_CallReplyStringPtr(rmr_listName, &listNameLen);
 
     // Add trimmedKeys value to a list
-    RedisModuleString* tempVal = RedisModule_CreateString(ctx, keyValue, keyValueLen);
-    RedisModuleString* listName = RedisModule_CreateString(ctx, "TEMP", strlen("TEMP"));
+    RedisModuleString* tempVal = RedisModule_CreateString(ctx, char_value, valueLen);
+    RedisModuleString* listName = RedisModule_CreateString(ctx, char_listName, listNameLen);
     RedisModuleKey* listKey = RedisModule_OpenKey(ctx, listName, REDISMODULE_WRITE);
     RedisModule_ListPush(listKey, REDISMODULE_LIST_TAIL, tempVal);
 
@@ -69,16 +62,20 @@ int addKey(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
 
     char* newStoreKey;
     char* newTempKey;
-    const char* userKey = RedisModule_StringPtrLen(argv[1], NULL);
+    RedisModuleString* rms_userKey = argv[1];
+    RedisModuleString* rms_userValue = argv[2];
+    RedisModuleString* rms_userExValue = argv[3];
+    RedisModuleString* rms_userList = argv[4];
+
+    const char* userKey = RedisModule_StringPtrLen(rms_userKey, NULL);
     newStoreKey = appendString(CTQ_STORE_NAMESPACE, userKey);
     newTempKey = appendString(CTQ_TEMP_NAMESPACE, userKey);
 
-    RedisModule_Call(ctx, "SET", "cs", newStoreKey, argv[2]);
-    RedisModule_Call(ctx, "SET", "cccs", newTempKey, "", "EX", argv[3]);
+    RedisModule_Call(ctx, "HMSET", "ccscs", newStoreKey, CTQ_STORE_HASH_VALUE, rms_userValue, CTQ_STORE_HASH_LIST, rms_userList);
+    RedisModule_Call(ctx, "SET", "cccs", newTempKey, "", "EX", rms_userExValue);
 
     RedisModule_Free(newStoreKey);
     RedisModule_Free(newTempKey);
-
     RedisModule_ReplyWithNull(ctx);
     return REDISMODULE_OK;
 }
