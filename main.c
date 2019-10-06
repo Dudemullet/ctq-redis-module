@@ -74,7 +74,7 @@ int addKey(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
     newTempKey = appendString(CTQ_TEMP_NAMESPACE, userKey);
 
     RedisModule_Call(ctx, "SET", "cs", newStoreKey, argv[2]);
-    RedisModule_Call(ctx, "SET", "cccc", newTempKey, "", "EX", "5");
+    RedisModule_Call(ctx, "SET", "cccs", newTempKey, "", "EX", argv[3]);
 
     RedisModule_Free(newStoreKey);
     RedisModule_Free(newTempKey);
