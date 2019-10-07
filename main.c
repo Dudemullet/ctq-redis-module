@@ -57,15 +57,24 @@ int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleSt
     return REDISMODULE_OK;
 }
 
+/* ctq.add key value list EX */
 int addKey(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
     RedisModule_AutoMemory(ctx);
+
+    // Arity and type checking
+    if (argc != 5) {
+        return RedisModule_WrongArity(ctx);
+    }
+    if (RedisModule_StringToLongLong(argv[4], NULL) != REDISMODULE_OK) {
+        return RedisModule_ReplyWithError(ctx, "ERR: EX must be a valid number");
+    }
 
     char* newStoreKey;
     char* newTempKey;
     RedisModuleString* rms_userKey = argv[1];
     RedisModuleString* rms_userValue = argv[2];
-    RedisModuleString* rms_userExValue = argv[3];
-    RedisModuleString* rms_userList = argv[4];
+    RedisModuleString* rms_userList = argv[3];
+    RedisModuleString* rms_userExValue = argv[4];
 
     const char* userKey = RedisModule_StringPtrLen(rms_userKey, NULL);
     newStoreKey = appendString(CTQ_STORE_NAMESPACE, userKey);
