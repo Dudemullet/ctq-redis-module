@@ -41,9 +41,9 @@ int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleSt
     RedisModule_Log(ctx, "warning", "Trimmed key: %s", trimmedKey);
 
     // Get the key value from the store
-    char* storeKey = appendString(CTQ_STORE_NAMESPACE, trimmedKey);
-    RedisModuleCallReply* rmr_value = RedisModule_Call(ctx, "HGET", "cc", storeKey, CTQ_STORE_HASH_VALUE);
-    RedisModuleCallReply* rmr_listName = RedisModule_Call(ctx, "HGET", "cc", storeKey, CTQ_STORE_HASH_LIST);
+    char* c_storeKey = appendString(CTQ_STORE_NAMESPACE, trimmedKey);
+    RedisModuleCallReply* rmr_value = RedisModule_Call(ctx, "HGET", "cc", c_storeKey, CTQ_STORE_HASH_VALUE);
+    RedisModuleCallReply* rmr_listName = RedisModule_Call(ctx, "HGET", "cc", c_storeKey, CTQ_STORE_HASH_LIST);
 
     char_value = RedisModule_CallReplyStringPtr(rmr_value, &valueLen);
     char_listName = RedisModule_CallReplyStringPtr(rmr_listName, &listNameLen);
@@ -53,6 +53,11 @@ int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleSt
     RedisModuleString* listName = RedisModule_CreateString(ctx, char_listName, listNameLen);
     RedisModuleKey* listKey = RedisModule_OpenKey(ctx, listName, REDISMODULE_WRITE);
     RedisModule_ListPush(listKey, REDISMODULE_LIST_TAIL, tempVal);
+
+    // Delete ctq:store:<expired> key
+    RedisModuleString* rms_storeKey = RedisModule_CreateString(ctx, c_storeKey, strlen(c_storeKey));
+    RedisModuleKey* rmk_storeKey = RedisModule_OpenKey(ctx, rms_storeKey, REDISMODULE_WRITE);
+    RedisModule_DeleteKey(rmk_storeKey);
 
     return REDISMODULE_OK;
 }
