@@ -1,3 +1,5 @@
 main.o
 main.so
+cancel.o
+cancel.so
 .vscode
