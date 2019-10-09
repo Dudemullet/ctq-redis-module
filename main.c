@@ -1,9 +1,6 @@
 #include "redismodule.h"
-
-const char* CTQ_STORE_NAMESPACE = "ctq:store:";
-const char* CTQ_TEMP_NAMESPACE = "ctq:temp:";
-const char* CTQ_STORE_HASH_VALUE = "value";
-const char* CTQ_STORE_HASH_LIST = "list";
+#include "main.h"
+#include "cancel.h"
 
 void chopN(char *str, size_t n) {
     size_t len = strlen(str);
@@ -103,9 +100,11 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) 
 
     RedisModule_SubscribeToKeyspaceEvents(ctx, REDISMODULE_NOTIFY_EXPIRED, &onKeyExpired);
 
-    int createStatus = RedisModule_CreateCommand(ctx, "ctq.add", addKey, "", 1, 1, 1);
+    // register all commands
+    int int_createAddCommand = RedisModule_CreateCommand(ctx, "ctq.add", addKey, "", 1, 1, 1);
+    int int_createCancelCommand = RedisModule_CreateCommand(ctx, "ctq.cancel", cancelTimeout, "", 1, 1, 1);
 
-    if (createStatus != REDISMODULE_OK)
+    if (int_createAddCommand != REDISMODULE_OK || int_createCancelCommand != REDISMODULE_OK)
     {
         printf("\n Loading module failed");
         return REDISMODULE_ERR;

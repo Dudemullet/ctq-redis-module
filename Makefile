@@ -24,6 +24,7 @@ LDFLAGS = -lm -lc
 
 MODULE_OBJ = $(ROOT)/main.o
 MODULE_SO = $(ROOT)/main.so
+DEPS = $(ROOT)/cancel.o
 
 export
 
