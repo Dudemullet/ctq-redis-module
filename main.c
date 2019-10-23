@@ -59,6 +59,16 @@ int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleSt
     return REDISMODULE_OK;
 }
 
+void getTime(RedisModuleCtx *ctx, int offset) {
+    time_t now;
+    struct tm *tm;
+
+    now = time(0) + offset;
+    tm = localtime(&now);
+
+    RedisModule_Log(ctx, "warning", "TIME: %04d-%02d-%02d %02d:%02d:%02d\n", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+}
+
 /* ctq.add key value list EX */
 int addKey(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
     RedisModule_AutoMemory(ctx);
@@ -81,6 +91,9 @@ int addKey(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
     const char* userKey = RedisModule_StringPtrLen(rms_userKey, NULL);
     newStoreKey = appendString(CTQ_STORE_NAMESPACE, userKey);
     newTempKey = appendString(CTQ_TEMP_NAMESPACE, userKey);
+
+    getTime(ctx, 0);
+    getTime(ctx, atoi(RedisModule_StringPtrLen(rms_userExValue, NULL)));
 
     RedisModule_Call(ctx, "HMSET", "ccscs", newStoreKey, CTQ_STORE_HASH_VALUE, rms_userValue, CTQ_STORE_HASH_LIST, rms_userList);
     RedisModule_Call(ctx, "SET", "cccs", newTempKey, "", "EX", rms_userExValue);
