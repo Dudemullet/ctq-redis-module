@@ -9,11 +9,11 @@ void chopN(char *str, size_t n) {
     memmove(str, str+n, len - n + 1);
 }
 
-char * appendString(const char* base, const char* stringToAppend) {
+char * appendString(RedisModuleCtx* ctx, const char* base, const char* stringToAppend) {
     char * newTempKey;
     size_t userKeyLength = strlen(stringToAppend);
 
-    newTempKey = RedisModule_Alloc(strlen(base) + userKeyLength);
+    newTempKey = RedisModule_PoolAlloc(ctx, strlen(base) + userKeyLength);
     newTempKey = strcpy(newTempKey, base);
     newTempKey = strcat(newTempKey, stringToAppend);
 

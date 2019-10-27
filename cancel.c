@@ -11,8 +11,8 @@ int cancelTimeout(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
     // create ctq:temp:<key> and ctq:temp:<key> strings
     RedisModuleString* rms_keyToCancel = argv[1];
     const char* char_keyToCancel = RedisModule_StringPtrLen(rms_keyToCancel, NULL);
-    char* char_storeKey = appendString(CTQ_STORE_NAMESPACE, char_keyToCancel);
-    char* char_tempKey = appendString(CTQ_TEMP_NAMESPACE, char_keyToCancel);
+    char* char_storeKey = appendString(ctx, CTQ_STORE_NAMESPACE, char_keyToCancel);
+    char* char_tempKey = appendString(ctx, CTQ_TEMP_NAMESPACE, char_keyToCancel);
 
     // Convert them to RedisModuleString for key opening
     RedisModuleString* rms_storeKey = RedisModule_CreateString(ctx, char_storeKey, strlen(char_storeKey));

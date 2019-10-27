@@ -1,3 +1,4 @@
+#include "redismodule.h"
 #include <time.h>
 #include <stdlib.h>
 
@@ -10,4 +11,4 @@ static const char* CTQ_STORE_HASH_TIME_SET = "time_set";
 static const char* CTQ_STORE_HASH_TIME_EXPECTED = "time_expected";
 
 // main.c Methods
-char * appendString(const char* base, const char* stringToAppend);
+char * appendString(RedisModuleCtx* ctx, const char* base, const char* stringToAppend);
