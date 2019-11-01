@@ -1,6 +1,14 @@
-#include "redismodule.h"
 #include "main.h"
 #include "cancel.h"
+
+void getTime(RedisModuleCtx *ctx, char* char_timestamp, int offset) {
+    time_t now;
+    struct tm *tm;
+
+    now = time(0) + offset;
+    tm = localtime(&now);
+    asprintf(&char_timestamp, "%04d-%02d-%02d %02d:%02d:%02d\n", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+}
 
 void chopN(char *str, size_t n) {
     size_t len = strlen(str);
@@ -32,13 +40,11 @@ int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleSt
     RedisModule_Log(ctx, "warning", "Event: %s", event);
     RedisModule_Log(ctx, "warning", "Event key: %s", RedisModule_StringPtrLen(redisStringKey, NULL));
 
-    // Trim the temp string from the key
-    char *trimmedKey = strdup(keyTemp);
+    char* trimmedKey = RedisModule_Strdup(keyTemp);
     chopN(trimmedKey, strlen(CTQ_TEMP_NAMESPACE));
-    RedisModule_Log(ctx, "warning", "Trimmed key: %s", trimmedKey);
 
     // Get the key value from the store
-    char* c_storeKey = appendString(CTQ_STORE_NAMESPACE, trimmedKey);
+    char* c_storeKey = appendString(ctx, CTQ_STORE_NAMESPACE, trimmedKey);
     RedisModuleCallReply* rmr_value = RedisModule_Call(ctx, "HGET", "cc", c_storeKey, CTQ_STORE_HASH_VALUE);
     RedisModuleCallReply* rmr_listName = RedisModule_Call(ctx, "HGET", "cc", c_storeKey, CTQ_STORE_HASH_LIST);
 
@@ -46,27 +52,22 @@ int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleSt
     char_listName = RedisModule_CallReplyStringPtr(rmr_listName, &listNameLen);
 
     // Add trimmedKeys value to a list
-    RedisModuleString* tempVal = RedisModule_CreateString(ctx, char_value, valueLen);
-    RedisModuleString* listName = RedisModule_CreateString(ctx, char_listName, listNameLen);
-    RedisModuleKey* listKey = RedisModule_OpenKey(ctx, listName, REDISMODULE_WRITE);
-    RedisModule_ListPush(listKey, REDISMODULE_LIST_TAIL, tempVal);
+    // RedisModuleString* tempVal = RedisModule_CreateString(ctx, char_value, valueLen);
+    // RedisModuleString* listName = RedisModule_CreateString(ctx, char_listName, listNameLen);
+    // RedisModuleKey* listKey = RedisModule_OpenKey(ctx, listName, REDISMODULE_WRITE);
+    // RedisModule_ListPush(listKey, REDISMODULE_LIST_TAIL, tempVal);
 
     // Delete ctq:store:<expired> key
-    RedisModuleString* rms_storeKey = RedisModule_CreateString(ctx, c_storeKey, strlen(c_storeKey));
-    RedisModuleKey* rmk_storeKey = RedisModule_OpenKey(ctx, rms_storeKey, REDISMODULE_WRITE);
-    RedisModule_DeleteKey(rmk_storeKey);
+    // RedisModuleString* rms_storeKey = RedisModule_CreateString(ctx, c_storeKey, strlen(c_storeKey));
+    // RedisModuleKey* rmk_storeKey = RedisModule_OpenKey(ctx, rms_storeKey, REDISMODULE_WRITE);
+    // RedisModule_DeleteKey(rmk_storeKey);
+
+    char* char_timestamp = NULL;
+    time_t time_currentTime = time(NULL);
+    asprintf(&char_timestamp, "%d", (int)time_currentTime);
+    RedisModule_Call(ctx, "HMSET", "ccc", c_storeKey, CTQ_STORE_HASH_TIME_OCURRED, char_timestamp);
 
     return REDISMODULE_OK;
-}
-
-void getTime(RedisModuleCtx *ctx, int offset) {
-    time_t now;
-    struct tm *tm;
-
-    now = time(0) + offset;
-    tm = localtime(&now);
-
-    RedisModule_Log(ctx, "warning", "TIME: %04d-%02d-%02d %02d:%02d:%02d\n", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
 }
 
 /* ctq.add key value list EX */
@@ -81,25 +82,28 @@ int addKey(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
         return RedisModule_ReplyWithError(ctx, "ERR: EX must be a valid number");
     }
 
-    char* newStoreKey;
-    char* newTempKey;
     RedisModuleString* rms_userKey = argv[1];
     RedisModuleString* rms_userValue = argv[2];
     RedisModuleString* rms_userList = argv[3];
     RedisModuleString* rms_userExValue = argv[4];
+    char* char_timestamp = NULL;
 
     const char* userKey = RedisModule_StringPtrLen(rms_userKey, NULL);
-    newStoreKey = appendString(CTQ_STORE_NAMESPACE, userKey);
-    newTempKey = appendString(CTQ_TEMP_NAMESPACE, userKey);
+    const char* char_userEX = RedisModule_StringPtrLen(rms_userExValue, NULL);
 
-    getTime(ctx, 0);
-    getTime(ctx, atoi(RedisModule_StringPtrLen(rms_userExValue, NULL)));
+    char* char_newTempKey = appendString(ctx, CTQ_TEMP_NAMESPACE, userKey);
+    RedisModule_Call(ctx, "SET", "cccc", char_newTempKey, "", "EX", char_userEX);
 
-    RedisModule_Call(ctx, "HMSET", "ccscs", newStoreKey, CTQ_STORE_HASH_VALUE, rms_userValue, CTQ_STORE_HASH_LIST, rms_userList);
-    RedisModule_Call(ctx, "SET", "cccs", newTempKey, "", "EX", rms_userExValue);
+    char* char_newStoreKey = appendString(ctx, CTQ_STORE_NAMESPACE, userKey);
 
-    RedisModule_Free(newStoreKey);
-    RedisModule_Free(newTempKey);
+    time_t time_currentTime = time(NULL) + atoi(char_userEX);
+    asprintf(&char_timestamp, "%d", (int)time_currentTime);
+
+    RedisModule_Call(ctx, "HMSET", "ccscscc", char_newStoreKey,
+        CTQ_STORE_HASH_VALUE, rms_userValue,
+        CTQ_STORE_HASH_LIST, rms_userList,
+        CTQ_STORE_HASH_TIME_EXPECTED, char_timestamp);
+
     RedisModule_ReplyWithNull(ctx);
     return REDISMODULE_OK;
 }
