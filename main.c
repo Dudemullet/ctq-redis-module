@@ -52,20 +52,16 @@ int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleSt
     char_listName = RedisModule_CallReplyStringPtr(rmr_listName, &listNameLen);
 
     // Add trimmedKeys value to a list
-    // RedisModuleString* tempVal = RedisModule_CreateString(ctx, char_value, valueLen);
-    // RedisModuleString* listName = RedisModule_CreateString(ctx, char_listName, listNameLen);
-    // RedisModuleKey* listKey = RedisModule_OpenKey(ctx, listName, REDISMODULE_WRITE);
-    // RedisModule_ListPush(listKey, REDISMODULE_LIST_TAIL, tempVal);
+    RedisModuleString* tempVal = RedisModule_CreateString(ctx, char_value, valueLen);
+    RedisModuleString* listName = RedisModule_CreateString(ctx, char_listName, listNameLen);
+    RedisModuleKey* listKey = RedisModule_OpenKey(ctx, listName, REDISMODULE_WRITE);
+    RedisModule_ListPush(listKey, REDISMODULE_LIST_TAIL, tempVal);
 
     // Delete ctq:store:<expired> key
-    // RedisModuleString* rms_storeKey = RedisModule_CreateString(ctx, c_storeKey, strlen(c_storeKey));
-    // RedisModuleKey* rmk_storeKey = RedisModule_OpenKey(ctx, rms_storeKey, REDISMODULE_WRITE);
-    // RedisModule_DeleteKey(rmk_storeKey);
-
-    char* char_timestamp = NULL;
-    time_t time_currentTime = time(NULL);
-    asprintf(&char_timestamp, "%d", (int)time_currentTime);
-    RedisModule_Call(ctx, "HMSET", "ccc", c_storeKey, CTQ_STORE_HASH_TIME_OCURRED, char_timestamp);
+    RedisModuleString* rms_storeKey = RedisModule_CreateString(ctx, c_storeKey, strlen(c_storeKey));
+    RedisModule_Log(ctx, "warning", "About to delete key: %s", RedisModule_StringPtrLen(rms_storeKey, NULL));
+    RedisModuleKey* rmk_storeKey = RedisModule_OpenKey(ctx, rms_storeKey, REDISMODULE_WRITE);
+    RedisModule_DeleteKey(rmk_storeKey);
 
     return REDISMODULE_OK;
 }
