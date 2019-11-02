@@ -100,7 +100,7 @@ int addKey(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
         CTQ_STORE_HASH_LIST, rms_userList,
         CTQ_STORE_HASH_TIME_EXPECTED, char_timestamp);
 
-    RedisModule_ReplyWithNull(ctx);
+    RedisModule_ReplyWithSimpleString(ctx, "OK");
     return REDISMODULE_OK;
 }
 

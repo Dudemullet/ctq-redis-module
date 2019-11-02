@@ -20,6 +20,11 @@ int cancelTimeout(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
     RedisModuleKey* rmk_storeKey = RedisModule_OpenKey(ctx, rms_storeKey, REDISMODULE_WRITE);
     RedisModuleKey* rmk_tempKey = RedisModule_OpenKey(ctx, rms_tempKey, REDISMODULE_WRITE);
 
+    if( RedisModule_KeyType(rmk_storeKey) == REDISMODULE_KEYTYPE_EMPTY) {
+        RedisModule_ReplyWithNull(ctx);
+        return REDISMODULE_OK;
+    }
+
     //Delete the keys
     RedisModule_DeleteKey(rmk_storeKey);
     RedisModule_DeleteKey(rmk_tempKey);
