@@ -48,21 +48,27 @@ int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleSt
     RedisModuleCallReply* rmr_value = RedisModule_Call(ctx, "HGET", "cc", c_storeKey, CTQ_STORE_HASH_VALUE);
     RedisModuleCallReply* rmr_listName = RedisModule_Call(ctx, "HGET", "cc", c_storeKey, CTQ_STORE_HASH_LIST);
 
+    // Open store Key, cancel op if it doesn't exist
+    RedisModuleString* rms_storeKey = RedisModule_CreateString(ctx, c_storeKey, strlen(c_storeKey));
+    RedisModule_Log(ctx, "warning", "About to delete key: %s", RedisModule_StringPtrLen(rms_storeKey, NULL));
+    RedisModuleKey* rmk_storeKey = RedisModule_OpenKey(ctx, rms_storeKey, REDISMODULE_WRITE);
+    if( RedisModule_KeyType(rmk_storeKey) == REDISMODULE_KEYTYPE_EMPTY) {
+        // key was not found, maybe this key isn't part of CTQ.
+        RedisModule_Log(ctx, "warning", "No ctq key found for %s, cancelling ctq delete op", c_storeKey);
+        return REDISMODULE_OK;
+    }
+
     char_value = RedisModule_CallReplyStringPtr(rmr_value, &valueLen);
     char_listName = RedisModule_CallReplyStringPtr(rmr_listName, &listNameLen);
 
     // Add trimmedKeys value to a list
     RedisModuleString* tempVal = RedisModule_CreateString(ctx, char_value, valueLen);
     RedisModuleString* listName = RedisModule_CreateString(ctx, char_listName, listNameLen);
-    RedisModuleKey* listKey = RedisModule_OpenKey(ctx, listName, REDISMODULE_WRITE);
-    RedisModule_ListPush(listKey, REDISMODULE_LIST_TAIL, tempVal);
+    RedisModuleKey* rmk_listName = RedisModule_OpenKey(ctx, listName, REDISMODULE_WRITE);
+    RedisModule_ListPush(rmk_listName, REDISMODULE_LIST_TAIL, tempVal);
 
     // Delete ctq:store:<expired> key
-    RedisModuleString* rms_storeKey = RedisModule_CreateString(ctx, c_storeKey, strlen(c_storeKey));
-    RedisModule_Log(ctx, "warning", "About to delete key: %s", RedisModule_StringPtrLen(rms_storeKey, NULL));
-    RedisModuleKey* rmk_storeKey = RedisModule_OpenKey(ctx, rms_storeKey, REDISMODULE_WRITE);
     RedisModule_DeleteKey(rmk_storeKey);
-
     return REDISMODULE_OK;
 }
 
