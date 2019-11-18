@@ -62,13 +62,13 @@ int onKeyExpired(RedisModuleCtx *ctx, int type, const char *event, RedisModuleSt
     char_listName = RedisModule_CallReplyStringPtr(rmr_listName, &listNameLen);
 
     // Add trimmedKeys value to a list
-    RedisModuleString* tempVal = RedisModule_CreateString(ctx, char_value, valueLen);
-    RedisModuleString* listName = RedisModule_CreateString(ctx, char_listName, listNameLen);
-    RedisModuleKey* rmk_listName = RedisModule_OpenKey(ctx, listName, REDISMODULE_WRITE);
-    RedisModule_ListPush(rmk_listName, REDISMODULE_LIST_TAIL, tempVal);
+    RedisModuleString* rms_value = RedisModule_CreateString(ctx, char_value, valueLen);
+    RedisModuleString* rms_listName = RedisModule_CreateString(ctx, char_listName, listNameLen);
+    RedisModule_Log(ctx, "warning", "Pushing to list: %s", char_listName);
+    RedisModule_Call(ctx, "LPUSH", "!ss", rms_listName, rms_value);
 
     // Delete ctq:store:<expired> key
-    RedisModule_DeleteKey(rmk_storeKey);
+    RedisModule_Call(ctx, "DEL", "!c", c_storeKey);
     return REDISMODULE_OK;
 }
 
@@ -94,14 +94,14 @@ int addKey(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
     const char* char_userEX = RedisModule_StringPtrLen(rms_userExValue, NULL);
 
     char* char_newTempKey = appendString(ctx, CTQ_TEMP_NAMESPACE, userKey);
-    RedisModule_Call(ctx, "SET", "cccc", char_newTempKey, "", "EX", char_userEX);
+    RedisModule_Call(ctx, "SET", "!cccc", char_newTempKey, "", "EX", char_userEX);
 
     char* char_newStoreKey = appendString(ctx, CTQ_STORE_NAMESPACE, userKey);
 
     time_t time_currentTime = time(NULL) + atoi(char_userEX);
     asprintf(&char_timestamp, "%d", (int)time_currentTime);
 
-    RedisModule_Call(ctx, "HMSET", "ccscscc", char_newStoreKey,
+    RedisModule_Call(ctx, "HMSET", "!ccscscc", char_newStoreKey,
         CTQ_STORE_HASH_VALUE, rms_userValue,
         CTQ_STORE_HASH_LIST, rms_userList,
         CTQ_STORE_HASH_TIME_EXPECTED, char_timestamp);
